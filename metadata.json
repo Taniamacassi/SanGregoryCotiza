@@ -1,0 +1,6 @@
+{
+  "name": "CotizaPro - Gestor de Cotizaciones Multirubro",
+  "description": "Sistema profesional para generar y administrar cotizaciones, presupuestos, clientes, productos y términos y condiciones configurables por rubro.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
