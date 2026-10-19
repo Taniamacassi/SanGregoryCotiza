@@ -182,3 +182,19 @@ export interface GoogleSheetsConfig {
   lastSyncedAt?: string;
   autoSyncOnSave?: boolean;
 }
+
+export interface RucAuthSession {
+  ruc: string;
+  businessName: string;
+  userName: string;
+  role: 'admin' | 'ventas';
+  loginAt: string;
+  rememberMe: boolean;
+}
+
+export interface SecurityConfig {
+  requireRucLogin: boolean;
+  accessPin: string;
+  accessRuc?: string;
+  allowQuickPin?: boolean;
+}

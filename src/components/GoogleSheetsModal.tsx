@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { Quote, Client, CompanyProfile, GoogleSheetsConfig } from '../types';
+import { Quote, Client, Product, CompanyProfile, GoogleSheetsConfig } from '../types';
 import {
   googleSignIn,
   getAccessToken,
@@ -38,6 +38,7 @@ interface Props {
   onClose: () => void;
   quotes: Quote[];
   clients: Client[];
+  products: Product[];
   company: CompanyProfile;
   onConfigChange?: (config: GoogleSheetsConfig | null) => void;
 }
@@ -47,6 +48,7 @@ export const GoogleSheetsModal: React.FC<Props> = ({
   onClose,
   quotes,
   clients,
+  products,
   company,
   onConfigChange,
 }) => {
@@ -144,13 +146,11 @@ export const GoogleSheetsModal: React.FC<Props> = ({
       setSheetsConfig(newConfig);
       if (onConfigChange) onConfigChange(newConfig);
 
-      // Now auto-populate with initial quotes if any
-      if (quotes.length > 0) {
-        await syncAllDataToSpreadsheet(result.id, quotes, clients, token);
-      }
+      // Now auto-populate with initial data if any
+      await syncAllDataToSpreadsheet(result.id, quotes, clients, products, token);
 
       setSuccessMessage(
-        `¡Hoja de cálculo creada con éxito con ${quotes.length} cotizaciones sincronizadas!`
+        `¡Hoja de cálculo creada con éxito con ${quotes.length} cotización(es), ${products.length} producto(s) y ${clients.length} cliente(s) sincronizados!`
       );
     } catch (err: any) {
       console.error(err);
@@ -238,6 +238,7 @@ export const GoogleSheetsModal: React.FC<Props> = ({
         sheetsConfig.spreadsheetId,
         quotes,
         clients,
+        products,
         token
       );
 
@@ -250,7 +251,7 @@ export const GoogleSheetsModal: React.FC<Props> = ({
       if (onConfigChange) onConfigChange(updated);
 
       setSuccessMessage(
-        `¡Sincronización completa! Se actualizaron ${res.quotesCount} cotizaciones, ${res.itemsCount} ítems y ${res.clientsCount} clientes en Google Sheets.`
+        `¡Sincronización completa! Se actualizaron ${res.quotesCount} cotizaciones, ${res.itemsCount} ítems, ${res.clientsCount} clientes y ${res.productsCount} productos en Google Sheets.`
       );
     } catch (err: any) {
       console.error(err);
@@ -417,6 +418,9 @@ export const GoogleSheetsModal: React.FC<Props> = ({
                 <span className="px-2 py-0.5 bg-white border border-emerald-200 rounded text-emerald-800 font-medium flex items-center gap-1">
                   <Table className="w-3 h-3 text-emerald-600" /> Clientes
                 </span>
+                <span className="px-2 py-0.5 bg-white border border-emerald-200 rounded text-emerald-800 font-medium flex items-center gap-1">
+                  <Table className="w-3 h-3 text-emerald-600" /> Catálogo de Productos
+                </span>
               </div>
 
               {/* Sync Controls */}
@@ -556,6 +560,9 @@ export const GoogleSheetsModal: React.FC<Props> = ({
               <li>
                 <strong>Clientes:</strong> Directorio consolidado de clientes con RUC/identificación tributaria, contactos y datos de facturación.
               </li>
+              <li>
+                <strong>Catálogo de Productos:</strong> Lista maestra de productos y servicios con SKU, descripción, unidad, precios y costos.
+              </li>
             </ul>
           </div>
         </div>
@@ -588,7 +595,7 @@ export const GoogleSheetsModal: React.FC<Props> = ({
                   <strong className="text-slate-800">
                     "{sheetsConfig?.spreadsheetTitle}"
                   </strong>
-                  , escribiendo {quotes.length} cotización(es) y {clients.length} cliente(s).
+                  , escribiendo {quotes.length} cotización(es), {products.length} producto(s) y {clients.length} cliente(s).
                 </p>
               </div>
             </div>

@@ -4,6 +4,7 @@ import {
   TermsTemplate,
   CurrencyConfig,
   CustomDigitalWallet,
+  SecurityConfig,
 } from '../types';
 import {
   Building2,
@@ -26,6 +27,15 @@ import {
   QrCode,
   Smartphone,
   Layers,
+  Database,
+  HardDrive,
+  FileSpreadsheet,
+  ShieldCheck,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  LogOut,
 } from 'lucide-react';
 import {
   exportAllData,
@@ -36,15 +46,21 @@ import {
 interface Props {
   company: CompanyProfile;
   termsTemplates: TermsTemplate[];
+  securityConfig: SecurityConfig;
   onSaveCompany: (updated: CompanyProfile) => void;
   onSaveTermsTemplates: (templates: TermsTemplate[]) => void;
+  onSaveSecurityConfig: (security: SecurityConfig) => void;
+  onLogout?: () => void;
 }
 
 export const CompanySettingsView: React.FC<Props> = ({
   company,
   termsTemplates,
+  securityConfig,
   onSaveCompany,
   onSaveTermsTemplates,
+  onSaveSecurityConfig,
+  onLogout,
 }) => {
   const [profile, setProfile] = useState<CompanyProfile>(() => {
     const copy = { ...company };
@@ -60,8 +76,10 @@ export const CompanySettingsView: React.FC<Props> = ({
   });
 
   const [templates, setTemplates] = useState<TermsTemplate[]>([...termsTemplates]);
+  const [localSecurity, setLocalSecurity] = useState<SecurityConfig>(securityConfig);
+  const [showSecPin, setShowSecPin] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'payments' | 'fiscal' | 'terms' | 'backup'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'payments' | 'fiscal' | 'terms' | 'backup' | 'security'>('profile');
 
   // Handle Logo File Upload (converted to Base64 data URL)
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,6 +155,7 @@ export const CompanySettingsView: React.FC<Props> = ({
     if (e) e.preventDefault();
     onSaveCompany(profile);
     onSaveTermsTemplates(templates);
+    onSaveSecurityConfig(localSecurity);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
@@ -350,6 +369,18 @@ export const CompanySettingsView: React.FC<Props> = ({
         >
           <RotateCcw className="w-4 h-4" />
           <span>Respaldos & Datos</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('security')}
+          className={`py-3 px-4 font-semibold border-b-2 transition-colors whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+            activeTab === 'security'
+              ? 'border-blue-600 text-blue-700'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <span>Seguridad & Acceso RUC</span>
         </button>
       </div>
 
@@ -1452,14 +1483,59 @@ export const CompanySettingsView: React.FC<Props> = ({
         <div className="bg-white p-6 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-6 text-xs">
           <div>
             <h3 className="font-bold text-slate-900 text-sm">
-              Copia de Seguridad y Restauración de Datos
+              Almacenamiento y Copia de Seguridad
             </h3>
             <p className="text-slate-500 mt-0.5">
-              Exporte toda su base de cotizaciones, clientes, productos y configuración a un archivo JSON seguro en su equipo.
+              Conozca dónde se guardan sus datos y gestione copias de seguridad locales y en la nube.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Architecture Breakdown Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div className="flex items-center gap-2 text-slate-800 font-bold">
+                <HardDrive className="w-4 h-4 text-blue-600" />
+                <span>1. Almacenamiento Local</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Toda la información operativa (datos de la empresa, catálogo de productos, clientes y cotizaciones) se almacena de forma instantánea y privada en el <strong>LocalStorage de su navegador</strong>. Funciona sin internet y permanece guardada en este equipo.
+              </p>
+              <div className="text-[10px] text-slate-500 font-mono bg-white p-2 rounded border border-slate-200">
+                cotizapro_company_v1<br />
+                cotizapro_products_v1<br />
+                cotizapro_clients_v1<br />
+                cotizapro_quotes_v1
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div className="flex items-center gap-2 text-slate-800 font-bold">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <span>2. Nube (Google Sheets)</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Mediante el botón de <strong>Google Sheets</strong> en la barra superior, puede sincronizar y respaldar cotizaciones, partidas de ítems, directorio de clientes y el catálogo completo en una hoja de cálculo en su Google Drive.
+              </p>
+              <div className="text-[11px] text-emerald-800 bg-emerald-50 p-2 rounded border border-emerald-200 font-medium">
+                Pestañas: Cotizaciones, Items Cotizados, Clientes y Catálogo de Productos.
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div className="flex items-center gap-2 text-slate-800 font-bold">
+                <Database className="w-4 h-4 text-purple-600" />
+                <span>3. Archivo Portátil (JSON)</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Puede descargar un archivo `.json` que contiene un volcado íntegro de la base de datos para transferirlo a otra computadora, guardar un respaldo en un disco externo o restaurarlo en cualquier momento.
+              </p>
+              <div className="text-[11px] text-purple-800 bg-purple-50 p-2 rounded border border-purple-200 font-medium">
+                Ideal para copias de seguridad periódicas y migración entre equipos.
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             {/* Download Backup */}
             <div className="p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
               <div className="w-10 h-10 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center">
@@ -1521,6 +1597,140 @@ export const CompanySettingsView: React.FC<Props> = ({
             >
               Restablecer Datos de Demostración
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 6: Security & RUC Access */}
+      {activeTab === 'security' && (
+        <div className="bg-white p-6 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-6 text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-100">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                Seguridad & Control de Acceso por RUC
+              </h3>
+              <p className="text-slate-500 mt-0.5">
+                Configure el acceso por RUC, clave de seguridad y bloqueo de pantalla para proteger la información comercial.
+              </p>
+            </div>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer shrink-0"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Bloquear y Cerrar Sesión</span>
+              </button>
+            )}
+          </div>
+
+          {/* Toggle Require RUC Login */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="font-bold text-slate-900 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-blue-600" />
+                <span>Exigir Login con RUC al iniciar la aplicación</span>
+              </div>
+              <p className="text-slate-500 text-[11px]">
+                Cuando esté activado, solicitará el RUC y la clave de acceso antes de permitir visualizar cotizaciones, catálogo de precios o clientes.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={localSecurity.requireRucLogin}
+                onChange={(e) => {
+                  const updated = { ...localSecurity, requireRucLogin: e.target.checked };
+                  setLocalSecurity(updated);
+                  onSaveSecurityConfig(updated);
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* RUC Configuration Card */}
+            <div className="p-5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
+              <div className="flex items-center gap-2 text-slate-800 font-bold">
+                <Building2 className="w-4 h-4 text-blue-600" />
+                <span>RUC Principal de Acceso</span>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Este es el RUC registrado para la empresa emisora. Se utiliza como identificación para acceder al sistema.
+              </p>
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 font-mono text-sm font-bold text-slate-800 flex items-center justify-between">
+                <span>{profile.taxId || '20608421901'}</span>
+                <span className="text-[10px] font-sans font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  RUC Activo
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Para modificar el RUC oficial o razón social, diríjase a la pestaña <strong>Razón Social & Identidad</strong>.
+              </p>
+            </div>
+
+            {/* PIN / Password Card */}
+            <div className="p-5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
+              <div className="flex items-center gap-2 text-slate-800 font-bold">
+                <KeyRound className="w-4 h-4 text-amber-600" />
+                <span>Clave o PIN de Seguridad</span>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Código requerido al ingresar con el RUC. Recomendado: 4 a 8 caracteres numéricos o alfanuméricos.
+              </p>
+              <div className="relative">
+                <input
+                  type={showSecPin ? 'text' : 'password'}
+                  value={localSecurity.accessPin}
+                  onChange={(e) => {
+                    setLocalSecurity({ ...localSecurity, accessPin: e.target.value });
+                  }}
+                  placeholder="PIN de acceso"
+                  className="w-full pr-10 pl-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:bg-white focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecPin(!showSecPin)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  {showSecPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onSaveSecurityConfig(localSecurity);
+                  setSavedSuccess(true);
+                  setTimeout(() => setSavedSuccess(false), 3000);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors cursor-pointer text-xs"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Guardar Nueva Clave</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Roles & Permissions summary */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <h4 className="font-bold text-slate-800 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              Perfiles y Roles de Usuario Soportados
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="p-3 bg-white rounded-lg border border-slate-200">
+                <span className="font-bold text-slate-900 block text-xs">Administrador General</span>
+                <span className="text-[11px] text-slate-500">Acceso total a cotizaciones, cartera de clientes, catálogo, ajustes fiscales, sincronización con Google Sheets y seguridad.</span>
+              </div>
+              <div className="p-3 bg-white rounded-lg border border-slate-200">
+                <span className="font-bold text-slate-900 block text-xs">Asesor Comercial / Ventas</span>
+                <span className="text-[11px] text-slate-500">Enfocado en la creación ágil de cotizaciones, visualización del catálogo y envío de propuestas a clientes.</span>
+              </div>
+            </div>
           </div>
         </div>
       )}

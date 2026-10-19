@@ -4,6 +4,7 @@ export const SHEET_NAMES = {
   QUOTES: 'Cotizaciones',
   ITEMS: 'Items Cotizados',
   CLIENTS: 'Clientes',
+  PRODUCTS: 'Catálogo de Productos',
 };
 
 export const QUOTE_HEADERS = [
@@ -62,6 +63,19 @@ export const CLIENT_HEADERS = [
   'País',
   'Notas',
   'Fecha Registro',
+];
+
+export const PRODUCT_HEADERS = [
+  'Código SKU',
+  'Nombre del Producto / Servicio',
+  'Descripción',
+  'Categoría',
+  'Unidad de Medida',
+  'Precio Unitario',
+  'Costo Unitario',
+  '% Impuesto / IVA',
+  'Estado',
+  'URL Imagen',
 ];
 
 /**
@@ -168,6 +182,24 @@ export function clientToRow(client: Client): (string | number)[] {
 }
 
 /**
+ * Convert Product to row array
+ */
+export function productToRow(product: Product): (string | number)[] {
+  return [
+    product.code || '',
+    product.name || '',
+    product.description || '',
+    product.category || 'General',
+    product.unit || 'Unid',
+    product.unitPrice ?? 0,
+    product.unitCost ?? 0,
+    product.taxRate ?? 0,
+    product.isActive !== false ? 'Activo' : 'Inactivo',
+    product.imageUrl || '',
+  ];
+}
+
+/**
  * Fetch spreadsheet metadata to check access and sheets
  */
 export async function getSpreadsheetInfo(
@@ -203,13 +235,13 @@ export async function getSpreadsheetInfo(
 }
 
 /**
- * Create a brand new Google Spreadsheet configured with our 3 sheets
+ * Create a brand new Google Spreadsheet configured with our 4 sheets
  */
 export async function createQuotesSpreadsheet(
   title: string,
   accessToken: string
 ): Promise<{ id: string; url: string; title: string }> {
-  // 1. Create spreadsheet with 3 tabs
+  // 1. Create spreadsheet with 4 tabs
   const createPayload = {
     properties: {
       title: title || 'CotizaPro - Registro de Cotizaciones y Ventas',
@@ -234,6 +266,14 @@ export async function createQuotesSpreadsheet(
       {
         properties: {
           title: SHEET_NAMES.CLIENTS,
+          gridProperties: {
+            frozenRowCount: 1,
+          },
+        },
+      },
+      {
+        properties: {
+          title: SHEET_NAMES.PRODUCTS,
           gridProperties: {
             frozenRowCount: 1,
           },
@@ -283,6 +323,10 @@ export async function createQuotesSpreadsheet(
           {
             range: `'${SHEET_NAMES.CLIENTS}'!A1:K1`,
             values: [CLIENT_HEADERS],
+          },
+          {
+            range: `'${SHEET_NAMES.PRODUCTS}'!A1:J1`,
+            values: [PRODUCT_HEADERS],
           },
         ],
       }),
@@ -350,6 +394,7 @@ export async function ensureSheetTabsExist(
   if (!info.sheets.includes(SHEET_NAMES.QUOTES)) missingTabs.push(SHEET_NAMES.QUOTES);
   if (!info.sheets.includes(SHEET_NAMES.ITEMS)) missingTabs.push(SHEET_NAMES.ITEMS);
   if (!info.sheets.includes(SHEET_NAMES.CLIENTS)) missingTabs.push(SHEET_NAMES.CLIENTS);
+  if (!info.sheets.includes(SHEET_NAMES.PRODUCTS)) missingTabs.push(SHEET_NAMES.PRODUCTS);
 
   if (missingTabs.length === 0) return;
 
@@ -381,6 +426,9 @@ export async function ensureSheetTabsExist(
   }
   if (missingTabs.includes(SHEET_NAMES.CLIENTS)) {
     data.push({ range: `'${SHEET_NAMES.CLIENTS}'!A1:K1`, values: [CLIENT_HEADERS] });
+  }
+  if (missingTabs.includes(SHEET_NAMES.PRODUCTS)) {
+    data.push({ range: `'${SHEET_NAMES.PRODUCTS}'!A1:J1`, values: [PRODUCT_HEADERS] });
   }
 
   if (data.length > 0) {
@@ -568,15 +616,17 @@ export async function syncAllDataToSpreadsheet(
   spreadsheetId: string,
   quotes: Quote[],
   clients: Client[],
+  products: Product[],
   accessToken: string
-): Promise<{ quotesCount: number; itemsCount: number; clientsCount: number }> {
+): Promise<{ quotesCount: number; itemsCount: number; clientsCount: number; productsCount: number }> {
   const cleanId = extractSpreadsheetId(spreadsheetId);
   await ensureSheetTabsExist(cleanId, accessToken);
 
-  // 1. Prepare all quote rows
+  // 1. Prepare all data rows
   const quoteRows = quotes.map((q) => quoteToRow(q));
   const allItemRows = quotes.flatMap((q) => quoteItemsToRows(q));
   const clientRows = clients.map((c) => clientToRow(c));
+  const productRows = products.map((p) => productToRow(p));
 
   // 2. Clear previous content (preserving row 1 headers)
   await Promise.all([
@@ -607,6 +657,15 @@ export async function syncAllDataToSpreadsheet(
         headers: { Authorization: `Bearer ${accessToken}` },
       }
     ),
+    fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${cleanId}/values/'${encodeURIComponent(
+        SHEET_NAMES.PRODUCTS
+      )}'!A2:J10000:clear`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    ),
   ]);
 
   // 3. Write new data batch
@@ -622,6 +681,10 @@ export async function syncAllDataToSpreadsheet(
     {
       range: `'${SHEET_NAMES.CLIENTS}'!A1:K1`,
       values: [CLIENT_HEADERS],
+    },
+    {
+      range: `'${SHEET_NAMES.PRODUCTS}'!A1:J1`,
+      values: [PRODUCT_HEADERS],
     },
   ];
 
@@ -643,6 +706,13 @@ export async function syncAllDataToSpreadsheet(
     batchData.push({
       range: `'${SHEET_NAMES.CLIENTS}'!A2:K${clientRows.length + 1}`,
       values: clientRows,
+    });
+  }
+
+  if (productRows.length > 0) {
+    batchData.push({
+      range: `'${SHEET_NAMES.PRODUCTS}'!A2:J${productRows.length + 1}`,
+      values: productRows,
     });
   }
 
@@ -670,5 +740,6 @@ export async function syncAllDataToSpreadsheet(
     quotesCount: quoteRows.length,
     itemsCount: allItemRows.length,
     clientsCount: clientRows.length,
+    productsCount: productRows.length,
   };
 }

@@ -6,6 +6,9 @@ import {
   CompanyProfile,
   TermsTemplate,
   QuoteStatus,
+  GoogleSheetsConfig,
+  RucAuthSession,
+  SecurityConfig,
 } from './types';
 import {
   getCompanyProfile,
@@ -27,10 +30,14 @@ import {
   getNextFolio,
   getGoogleSheetsConfig,
   saveGoogleSheetsConfig,
+  getAuthSession,
+  saveAuthSession,
+  clearAuthSession,
+  getSecurityConfig,
+  saveSecurityConfig,
 } from './utils/storage';
 import { getAccessToken, googleSignIn } from './utils/googleAuth';
 import { saveQuoteToSpreadsheet } from './utils/googleSheetsService';
-import { GoogleSheetsConfig } from './types';
 import { DashboardView } from './components/DashboardView';
 import { QuotesListView } from './components/QuotesListView';
 import { QuoteBuilderView } from './components/QuoteBuilderView';
@@ -39,6 +46,7 @@ import { ClientsView } from './components/ClientsView';
 import { ProductsView } from './components/ProductsView';
 import { CompanySettingsView } from './components/CompanySettingsView';
 import { GoogleSheetsModal } from './components/GoogleSheetsModal';
+import { RucLoginView } from './components/RucLoginView';
 import {
   FileText,
   Plus,
@@ -51,6 +59,8 @@ import {
   X,
   FileSpreadsheet,
   CheckCircle2,
+  ShieldCheck,
+  LogOut,
 } from 'lucide-react';
 
 type ActiveView =
@@ -77,6 +87,22 @@ export default function App() {
   const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig | null>(getGoogleSheetsConfig);
   const [googleSheetsModalOpen, setGoogleSheetsModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Security & RUC Auth State
+  const [securityConfig, setSecurityConfig] = useState<SecurityConfig>(getSecurityConfig);
+  const [authSession, setAuthSession] = useState<RucAuthSession | null>(getAuthSession);
+
+  const handleLoginSuccess = (session: RucAuthSession) => {
+    saveAuthSession(session);
+    setAuthSession(session);
+    showToast(`¡Bienvenido! Sesión iniciada para ${session.businessName} (RUC: ${session.ruc})`);
+  };
+
+  const handleLogout = () => {
+    clearAuthSession();
+    setAuthSession(null);
+    showToast('Sesión cerrada y pantalla bloqueada correctamente.');
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -288,6 +314,17 @@ export default function App() {
     setTermsTemplates(tpls);
   };
 
+  // RUC Access Gate: require login if enabled and no active session
+  if (securityConfig.requireRucLogin && !authSession) {
+    return (
+      <RucLoginView
+        company={company}
+        securityConfig={securityConfig}
+        onLoginSuccess={handleLoginSuccess}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col font-sans">
       {/* Universal Top Bar Contract: Zone 1 (Wordmark) - Zone 2 (4-5 Nav Links) - Zone 3 (1 Primary Action) */}
@@ -368,6 +405,20 @@ export default function App() {
 
           {/* Zone 3: Actions */}
           <div className="flex items-center gap-2.5 shrink-0">
+            {/* RUC Auth Badge */}
+            {authSession && (
+              <div
+                className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-700 font-mono shadow-2xs"
+                title={`Sesión iniciada: ${authSession.userName} · ${authSession.businessName}`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-bold">RUC: {authSession.ruc}</span>
+                <span className="text-slate-400 font-sans font-medium text-[10px]">
+                  ({authSession.role === 'admin' ? 'Admin' : 'Ventas'})
+                </span>
+              </div>
+            )}
+
             {/* Google Sheets button with status dot */}
             <button
               onClick={() => setGoogleSheetsModalOpen(true)}
@@ -392,6 +443,17 @@ export default function App() {
               <Plus className="w-3.5 h-3.5" />
               <span>Nueva Cotización</span>
             </button>
+
+            {/* Logout / Screen lock button */}
+            {authSession && (
+              <button
+                onClick={handleLogout}
+                className="hidden sm:inline-flex p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                title={`Bloquear pantalla / Cerrar sesión (RUC: ${authSession.ruc})`}
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Mobile Hamburger toggle */}
             <button
@@ -449,7 +511,7 @@ export default function App() {
               }}
               className="w-full text-left py-2 px-3 rounded-lg hover:bg-slate-100 block"
             >
-              Configuración de Empresa
+              Configuración de Empresa & Seguridad
             </button>
             <button
               onClick={() => {
@@ -464,6 +526,24 @@ export default function App() {
               </div>
               {sheetsConfig && <span className="text-[10px] bg-emerald-100 px-2 py-0.5 rounded-full font-semibold">Conectado</span>}
             </button>
+            {authSession && (
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-1.5 text-slate-600 font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>RUC: {authSession.ruc} ({authSession.role})</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="text-rose-600 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </header>
@@ -547,8 +627,14 @@ export default function App() {
           <CompanySettingsView
             company={company}
             termsTemplates={termsTemplates}
+            securityConfig={securityConfig}
             onSaveCompany={handleSaveCompany}
             onSaveTermsTemplates={handleSaveTermsTemplates}
+            onSaveSecurityConfig={(cfg) => {
+              saveSecurityConfig(cfg);
+              setSecurityConfig(cfg);
+            }}
+            onLogout={handleLogout}
           />
         )}
       </main>
@@ -559,6 +645,7 @@ export default function App() {
         onClose={() => setGoogleSheetsModalOpen(false)}
         quotes={quotes}
         clients={clients}
+        products={products}
         company={company}
         onConfigChange={(newCfg) => setSheetsConfig(newCfg)}
       />

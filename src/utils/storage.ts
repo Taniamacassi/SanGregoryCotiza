@@ -6,6 +6,8 @@ import {
   TermsTemplate,
   CurrencyConfig,
   GoogleSheetsConfig,
+  RucAuthSession,
+  SecurityConfig,
 } from '../types';
 import {
   INITIAL_COMPANY_PROFILE,
@@ -22,6 +24,8 @@ const STORAGE_KEYS = {
   QUOTES: 'cotizapro_quotes_v1',
   TERMS: 'cotizapro_terms_v1',
   SHEETS_CONFIG: 'cotizapro_sheets_config_v1',
+  AUTH_SESSION: 'cotizapro_auth_session_v1',
+  SECURITY_CONFIG: 'cotizapro_security_config_v1',
 };
 
 // Safe JSON parser
@@ -273,4 +277,61 @@ export function getGoogleSheetsConfig(): GoogleSheetsConfig | null {
 
 export function saveGoogleSheetsConfig(config: GoogleSheetsConfig | null): void {
   safeSet(STORAGE_KEYS.SHEETS_CONFIG, config);
+}
+
+// ----------------------------------------------------
+// Security & RUC Auth
+// ----------------------------------------------------
+export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
+  requireRucLogin: true,
+  accessPin: '1234',
+  allowQuickPin: true,
+};
+
+export function getSecurityConfig(): SecurityConfig {
+  const cfg = safeGet<SecurityConfig>(STORAGE_KEYS.SECURITY_CONFIG, DEFAULT_SECURITY_CONFIG);
+  if (!cfg.accessPin) cfg.accessPin = '1234';
+  if (cfg.requireRucLogin === undefined) cfg.requireRucLogin = true;
+  return cfg;
+}
+
+export function saveSecurityConfig(config: SecurityConfig): void {
+  safeSet(STORAGE_KEYS.SECURITY_CONFIG, config);
+}
+
+export function getAuthSession(): RucAuthSession | null {
+  try {
+    const local = localStorage.getItem(STORAGE_KEYS.AUTH_SESSION);
+    if (local) return JSON.parse(local) as RucAuthSession;
+
+    const session = sessionStorage.getItem(STORAGE_KEYS.AUTH_SESSION);
+    if (session) return JSON.parse(session) as RucAuthSession;
+
+    return null;
+  } catch (err) {
+    console.error('Error reading auth session', err);
+    return null;
+  }
+}
+
+export function saveAuthSession(session: RucAuthSession): void {
+  try {
+    const raw = JSON.stringify(session);
+    if (session.rememberMe) {
+      localStorage.setItem(STORAGE_KEYS.AUTH_SESSION, raw);
+    } else {
+      sessionStorage.setItem(STORAGE_KEYS.AUTH_SESSION, raw);
+    }
+  } catch (err) {
+    console.error('Error saving auth session', err);
+  }
+}
+
+export function clearAuthSession(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+    sessionStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+  } catch (err) {
+    console.error('Error clearing auth session', err);
+  }
 }
