@@ -174,3 +174,11 @@ export interface TermsTemplate {
   terms: string;
   notes: string;
 }
+
+export interface GoogleSheetsConfig {
+  spreadsheetId: string;
+  spreadsheetUrl: string;
+  spreadsheetTitle: string;
+  lastSyncedAt?: string;
+  autoSyncOnSave?: boolean;
+}

@@ -5,6 +5,7 @@ import {
   Quote,
   TermsTemplate,
   CurrencyConfig,
+  GoogleSheetsConfig,
 } from '../types';
 import {
   INITIAL_COMPANY_PROFILE,
@@ -20,6 +21,7 @@ const STORAGE_KEYS = {
   PRODUCTS: 'cotizapro_products_v1',
   QUOTES: 'cotizapro_quotes_v1',
   TERMS: 'cotizapro_terms_v1',
+  SHEETS_CONFIG: 'cotizapro_sheets_config_v1',
 };
 
 // Safe JSON parser
@@ -260,4 +262,15 @@ export function resetToDemoData(): void {
   safeSet(STORAGE_KEYS.PRODUCTS, INITIAL_PRODUCTS);
   safeSet(STORAGE_KEYS.QUOTES, INITIAL_QUOTES);
   safeSet(STORAGE_KEYS.TERMS, DEFAULT_TERMS_TEMPLATES);
+}
+
+// ----------------------------------------------------
+// Google Sheets Config
+// ----------------------------------------------------
+export function getGoogleSheetsConfig(): GoogleSheetsConfig | null {
+  return safeGet<GoogleSheetsConfig | null>(STORAGE_KEYS.SHEETS_CONFIG, null);
+}
+
+export function saveGoogleSheetsConfig(config: GoogleSheetsConfig | null): void {
+  safeSet(STORAGE_KEYS.SHEETS_CONFIG, config);
 }

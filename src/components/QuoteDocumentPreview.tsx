@@ -24,6 +24,7 @@ import {
   Star,
   Banknote,
   Sparkles,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface Props {
@@ -31,6 +32,8 @@ interface Props {
   onBack: () => void;
   onEdit: (quote: Quote) => void;
   onUpdateStatus?: (newStatus: Quote['status']) => void;
+  onOpenGoogleSheets?: () => void;
+  onSyncQuoteToSheets?: (quote: Quote) => Promise<void>;
 }
 
 export const QuoteDocumentPreview: React.FC<Props> = ({
@@ -38,11 +41,15 @@ export const QuoteDocumentPreview: React.FC<Props> = ({
   onBack,
   onEdit,
   onUpdateStatus,
+  onOpenGoogleSheets,
+  onSyncQuoteToSheets,
 }) => {
   const [selectedTheme, setSelectedTheme] = useState<QuoteTheme>(
     quote.templateTheme || 'corporate'
   );
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isSavingToSheets, setIsSavingToSheets] = useState(false);
+  const [sheetsSavedSuccess, setSheetsSavedSuccess] = useState(false);
   const [displayImages, setDisplayImages] = useState(quote.showProductImages !== false);
 
   const { companySnapshot: comp, clientSnapshot: cli, items, currency } = quote;
@@ -281,6 +288,33 @@ export const QuoteDocumentPreview: React.FC<Props> = ({
               <Share2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">WhatsApp</span>
             </button>
+
+            {onSyncQuoteToSheets && (
+              <button
+                onClick={async () => {
+                  setIsSavingToSheets(true);
+                  try {
+                    await onSyncQuoteToSheets(quote);
+                    setSheetsSavedSuccess(true);
+                    setTimeout(() => setSheetsSavedSuccess(false), 3500);
+                  } finally {
+                    setIsSavingToSheets(false);
+                  }
+                }}
+                disabled={isSavingToSheets}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                title="Guardar o actualizar esta cotización en Google Sheets"
+              >
+                <FileSpreadsheet className={`w-3.5 h-3.5 text-emerald-600 ${isSavingToSheets ? 'animate-pulse' : ''}`} />
+                <span>
+                  {sheetsSavedSuccess
+                    ? '¡Guardado en Sheets!'
+                    : isSavingToSheets
+                    ? 'Guardando...'
+                    : 'Google Sheets'}
+                </span>
+              </button>
+            )}
 
             <button
               onClick={handleCopySummary}

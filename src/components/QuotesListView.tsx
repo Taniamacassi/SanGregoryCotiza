@@ -17,6 +17,7 @@ import {
   XCircle,
   FileText,
   Filter,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface Props {
@@ -28,6 +29,8 @@ interface Props {
   onDuplicateQuote: (quote: Quote) => void;
   onDeleteQuote: (id: string) => void;
   onUpdateStatus: (id: string, status: QuoteStatus) => void;
+  onOpenGoogleSheets?: () => void;
+  onSyncQuoteToSheets?: (quote: Quote) => Promise<void>;
 }
 
 export const QuotesListView: React.FC<Props> = ({
@@ -39,9 +42,12 @@ export const QuotesListView: React.FC<Props> = ({
   onDuplicateQuote,
   onDeleteQuote,
   onUpdateStatus,
+  onOpenGoogleSheets,
+  onSyncQuoteToSheets,
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [syncingId, setSyncingId] = useState<string | null>(null);
 
   const filteredQuotes = quotes.filter((q) => {
     const matchesSearch =
@@ -132,13 +138,26 @@ export const QuotesListView: React.FC<Props> = ({
           </p>
         </div>
 
-        <button
-          onClick={onCreateNew}
-          className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nueva Cotización</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {onOpenGoogleSheets && (
+            <button
+              onClick={onOpenGoogleSheets}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg shadow-xs transition-colors cursor-pointer"
+              title="Configurar y sincronizar con Google Sheets"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Google Sheets</span>
+            </button>
+          )}
+
+          <button
+            onClick={onCreateNew}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva Cotización</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -330,6 +349,24 @@ export const QuotesListView: React.FC<Props> = ({
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
+
+                          {onSyncQuoteToSheets && (
+                            <button
+                              onClick={async () => {
+                                setSyncingId(q.id);
+                                try {
+                                  await onSyncQuoteToSheets(q);
+                                } finally {
+                                  setSyncingId(null);
+                                }
+                              }}
+                              disabled={syncingId === q.id}
+                              className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer disabled:opacity-50"
+                              title="Guardar o actualizar en Google Sheets"
+                            >
+                              <FileSpreadsheet className={`w-4 h-4 ${syncingId === q.id ? 'animate-pulse' : ''}`} />
+                            </button>
+                          )}
 
                           <button
                             onClick={() => handleShareWhatsApp(q)}

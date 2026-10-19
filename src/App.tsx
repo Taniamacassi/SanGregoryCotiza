@@ -25,7 +25,12 @@ import {
   getTermsTemplates,
   saveTermsTemplates,
   getNextFolio,
+  getGoogleSheetsConfig,
+  saveGoogleSheetsConfig,
 } from './utils/storage';
+import { getAccessToken, googleSignIn } from './utils/googleAuth';
+import { saveQuoteToSpreadsheet } from './utils/googleSheetsService';
+import { GoogleSheetsConfig } from './types';
 import { DashboardView } from './components/DashboardView';
 import { QuotesListView } from './components/QuotesListView';
 import { QuoteBuilderView } from './components/QuoteBuilderView';
@@ -33,6 +38,7 @@ import { QuoteDocumentPreview } from './components/QuoteDocumentPreview';
 import { ClientsView } from './components/ClientsView';
 import { ProductsView } from './components/ProductsView';
 import { CompanySettingsView } from './components/CompanySettingsView';
+import { GoogleSheetsModal } from './components/GoogleSheetsModal';
 import {
   FileText,
   Plus,
@@ -43,6 +49,8 @@ import {
   Settings,
   Menu,
   X,
+  FileSpreadsheet,
+  CheckCircle2,
 } from 'lucide-react';
 
 type ActiveView =
@@ -64,6 +72,18 @@ export default function App() {
   const [currentView, setCurrentView] = useState<ActiveView>('dashboard');
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
+
+  // Google Sheets state & notification toast
+  const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig | null>(getGoogleSheetsConfig);
+  const [googleSheetsModalOpen, setGoogleSheetsModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 4000);
+  };
 
   // Mobile menu toggle
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -136,6 +156,60 @@ export default function App() {
       setCurrentView('preview');
     } else {
       setCurrentView('quotes');
+    }
+
+    // Auto-sync in background if Google Sheets is connected
+    const currentSheetsConfig = getGoogleSheetsConfig();
+    if (currentSheetsConfig?.spreadsheetId && currentSheetsConfig.autoSyncOnSave !== false) {
+      getAccessToken()
+        .then((token) => {
+          if (token) {
+            saveQuoteToSpreadsheet(currentSheetsConfig.spreadsheetId, quote, token)
+              .then(() => {
+                const refreshed: GoogleSheetsConfig = {
+                  ...currentSheetsConfig,
+                  lastSyncedAt: new Date().toISOString(),
+                };
+                saveGoogleSheetsConfig(refreshed);
+                setSheetsConfig(refreshed);
+                showToast(`Cotización ${quote.folio} guardada en Google Sheets`);
+              })
+              .catch((err) => console.warn('Background auto-sync failed:', err));
+          }
+        })
+        .catch((e) => console.warn('Token check error:', e));
+    }
+  };
+
+  const handleSyncQuoteToSheets = async (quote: Quote) => {
+    const currentSheetsConfig = getGoogleSheetsConfig();
+    if (!currentSheetsConfig?.spreadsheetId) {
+      setGoogleSheetsModalOpen(true);
+      return;
+    }
+
+    let token = await getAccessToken();
+    if (!token) {
+      const loginRes = await googleSignIn();
+      token = loginRes?.accessToken || null;
+    }
+    if (!token) {
+      setGoogleSheetsModalOpen(true);
+      return;
+    }
+
+    try {
+      await saveQuoteToSpreadsheet(currentSheetsConfig.spreadsheetId, quote, token);
+      const refreshed: GoogleSheetsConfig = {
+        ...currentSheetsConfig,
+        lastSyncedAt: new Date().toISOString(),
+      };
+      saveGoogleSheetsConfig(refreshed);
+      setSheetsConfig(refreshed);
+      showToast(`¡Cotización ${quote.folio} guardada en Google Sheets con éxito!`);
+    } catch (err: any) {
+      console.error(err);
+      alert('Error al guardar en Google Sheets: ' + (err.message || err));
     }
   };
 
@@ -292,8 +366,25 @@ export default function App() {
             </button>
           </nav>
 
-          {/* Zone 3: 1 Primary action */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Zone 3: Actions */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Google Sheets button with status dot */}
+            <button
+              onClick={() => setGoogleSheetsModalOpen(true)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer shadow-2xs ${
+                sheetsConfig
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+              title={sheetsConfig ? `Google Sheets conectado: ${sheetsConfig.spreadsheetTitle}` : 'Conectar Google Sheets'}
+            >
+              <FileSpreadsheet className={`w-3.5 h-3.5 ${sheetsConfig ? 'text-emerald-600' : 'text-slate-500'}`} />
+              <span className="hidden sm:inline">Google Sheets</span>
+              {sheetsConfig && (
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              )}
+            </button>
+
             <button
               onClick={handleStartCreateQuote}
               className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer inline-flex items-center gap-1.5"
@@ -360,6 +451,19 @@ export default function App() {
             >
               Configuración de Empresa
             </button>
+            <button
+              onClick={() => {
+                setGoogleSheetsModalOpen(true);
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left py-2 px-3 rounded-lg hover:bg-slate-100 flex items-center justify-between text-emerald-700 font-bold"
+            >
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <span>Google Sheets</span>
+              </div>
+              {sheetsConfig && <span className="text-[10px] bg-emerald-100 px-2 py-0.5 rounded-full font-semibold">Conectado</span>}
+            </button>
           </div>
         )}
       </header>
@@ -388,6 +492,8 @@ export default function App() {
             onDuplicateQuote={handleDuplicateQuote}
             onDeleteQuote={handleDeleteQuote}
             onUpdateStatus={handleUpdateQuoteStatus}
+            onOpenGoogleSheets={() => setGoogleSheetsModalOpen(true)}
+            onSyncQuoteToSheets={handleSyncQuoteToSheets}
           />
         )}
 
@@ -412,6 +518,8 @@ export default function App() {
             onUpdateStatus={(newStatus) =>
               handleUpdateQuoteStatus(selectedQuote.id, newStatus)
             }
+            onOpenGoogleSheets={() => setGoogleSheetsModalOpen(true)}
+            onSyncQuoteToSheets={handleSyncQuoteToSheets}
           />
         )}
 
@@ -444,6 +552,30 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Google Sheets Modal */}
+      <GoogleSheetsModal
+        isOpen={googleSheetsModalOpen}
+        onClose={() => setGoogleSheetsModalOpen(false)}
+        quotes={quotes}
+        clients={clients}
+        company={company}
+        onConfigChange={(newCfg) => setSheetsConfig(newCfg)}
+      />
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-medium border border-slate-700 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-white ml-2 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="no-print bg-white border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-500">
