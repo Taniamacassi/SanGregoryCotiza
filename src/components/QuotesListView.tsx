@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Quote, QuoteStatus, CompanyProfile } from '../types';
 import { formatCurrency } from '../utils/storage';
+import { ConfirmModal } from './ConfirmModal';
 import {
   Search,
   Plus,
@@ -18,6 +19,8 @@ import {
   FileText,
   Filter,
   FileSpreadsheet,
+  CheckSquare,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Props {
@@ -28,9 +31,12 @@ interface Props {
   onEditQuote: (quote: Quote) => void;
   onDuplicateQuote: (quote: Quote) => void;
   onDeleteQuote: (id: string) => void;
+  onDeleteMultipleQuotes?: (ids: string[]) => void;
+  onClearAllQuotes?: () => void;
   onUpdateStatus: (id: string, status: QuoteStatus) => void;
   onOpenGoogleSheets?: () => void;
   onSyncQuoteToSheets?: (quote: Quote) => Promise<void>;
+  onRestoreDemo?: () => void;
 }
 
 export const QuotesListView: React.FC<Props> = ({
@@ -41,13 +47,32 @@ export const QuotesListView: React.FC<Props> = ({
   onEditQuote,
   onDuplicateQuote,
   onDeleteQuote,
+  onDeleteMultipleQuotes,
+  onClearAllQuotes,
   onUpdateStatus,
   onOpenGoogleSheets,
   onSyncQuoteToSheets,
+  onRestoreDemo,
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    details?: string;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'primary';
+    requireConfirmWord?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const filteredQuotes = quotes.filter((q) => {
     const matchesSearch =
@@ -125,6 +150,74 @@ export const QuotesListView: React.FC<Props> = ({
     rechazada: quotes.filter((q) => q.status === 'rechazada').length,
   };
 
+  const handleToggleSelectAll = () => {
+    if (selectedIds.length === filteredQuotes.length && filteredQuotes.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredQuotes.map((q) => q.id));
+    }
+  };
+
+  const handleToggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handlePromptDeleteSingle = (q: Quote) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `¿Eliminar cotización ${q.folio}?`,
+      message: `Está a punto de eliminar permanentemente la cotización ${q.folio} emitida para ${q.clientSnapshot?.name || 'Cliente'}.`,
+      details: `Total: ${formatCurrency(q.total, q.currency)} | Fecha: ${q.issueDate}`,
+      confirmLabel: 'Eliminar Cotización',
+      variant: 'danger',
+      onConfirm: () => {
+        onDeleteQuote(q.id);
+        setSelectedIds((prev) => prev.filter((id) => id !== q.id));
+      },
+    });
+  };
+
+  const handlePromptDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    setConfirmModal({
+      isOpen: true,
+      title: `¿Eliminar ${selectedIds.length} cotización${selectedIds.length > 1 ? 'es' : ''} seleccionada${selectedIds.length > 1 ? 's' : ''}?`,
+      message: `Se eliminarán permanentemente las ${selectedIds.length} cotizaciones seleccionadas del historial comercial.`,
+      confirmLabel: `Eliminar (${selectedIds.length})`,
+      variant: 'danger',
+      onConfirm: () => {
+        if (onDeleteMultipleQuotes) {
+          onDeleteMultipleQuotes(selectedIds);
+        } else {
+          selectedIds.forEach((id) => onDeleteQuote(id));
+        }
+        setSelectedIds([]);
+      },
+    });
+  };
+
+  const handlePromptClearAll = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: '¿Vaciar Historial de Cotizaciones (Data Limpia)?',
+      message: 'Esta acción eliminará TODAS las cotizaciones generadas para dejar el historial completamente en blanco.',
+      details: `Total a eliminar: ${quotes.length} cotizaciones registradas.`,
+      confirmLabel: 'Vaciar Todo (Data Limpia)',
+      variant: 'danger',
+      requireConfirmWord: 'LIMPIAR',
+      onConfirm: () => {
+        if (onClearAllQuotes) {
+          onClearAllQuotes();
+        } else {
+          quotes.forEach((q) => onDeleteQuote(q.id));
+        }
+        setSelectedIds([]);
+      },
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner & Primary Action */}
@@ -139,6 +232,18 @@ export const QuotesListView: React.FC<Props> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {quotes.length > 0 && onClearAllQuotes && (
+            <button
+              type="button"
+              onClick={handlePromptClearAll}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+              title="Vaciar todas las cotizaciones para empezar con data limpia"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Vaciar Cotizaciones (Data Limpia)</span>
+            </button>
+          )}
+
           {onOpenGoogleSheets && (
             <button
               onClick={onOpenGoogleSheets}
@@ -159,6 +264,36 @@ export const QuotesListView: React.FC<Props> = ({
           </button>
         </div>
       </div>
+
+      {/* Floating / Active Bulk Selection Toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="bg-slate-900 text-white p-3 px-4 rounded-xl flex items-center justify-between gap-4 shadow-lg animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-center gap-2 text-xs font-semibold">
+            <CheckSquare className="w-4 h-4 text-blue-400" />
+            <span>
+              {selectedIds.length} cotización{selectedIds.length > 1 ? 'es' : ''} seleccionada{selectedIds.length > 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 text-xs text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Deseleccionar
+            </button>
+            <button
+              type="button"
+              onClick={handlePromptDeleteSelected}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Eliminar Seleccionadas ({selectedIds.length})</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
@@ -187,36 +322,50 @@ export const QuotesListView: React.FC<Props> = ({
           ))}
         </div>
 
-        {/* Search input */}
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar por folio (ej. COT-2026-101), nombre de cliente o descripción de ítem..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-xs pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-          />
+        {/* Search input & Select all checkbox */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="relative w-full">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por folio (ej. COT-2026-101), nombre de cliente o descripción de ítem..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full text-xs pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {filteredQuotes.length > 0 && (
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer self-start sm:self-center shrink-0">
+              <input
+                type="checkbox"
+                checked={selectedIds.length === filteredQuotes.length}
+                onChange={handleToggleSelectAll}
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span>Seleccionar todas ({filteredQuotes.length})</span>
+            </label>
+          )}
         </div>
       </div>
 
       {/* Quotations Table */}
       {filteredQuotes.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center space-y-3">
-          <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto">
+          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto">
             <FileText className="w-6 h-6" />
           </div>
-          <h3 className="text-sm font-bold text-slate-800">
+          <h3 className="text-base font-bold text-slate-900">
             {search || statusFilter !== 'all'
               ? 'No se encontraron cotizaciones con los filtros aplicados'
-              : 'Aún no tiene cotizaciones generadas'}
+              : 'Historial Limpio / Data Limpia'}
           </h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
             {search || statusFilter !== 'all'
               ? 'Intente buscar con otros términos o restablezca el filtro de estado.'
-              : 'Comience creando su primera cotización para un cliente y personalice los términos comerciales.'}
+              : 'El historial de cotizaciones se encuentra limpio de datos de prueba. Comience creando su primera propuesta comercial para un cliente.'}
           </p>
-          <div className="pt-2">
+          <div className="pt-2 flex items-center justify-center gap-2 flex-wrap">
             <button
               onClick={onCreateNew}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs cursor-pointer"
@@ -224,6 +373,16 @@ export const QuotesListView: React.FC<Props> = ({
               <Plus className="w-3.5 h-3.5" />
               <span>Crear Nueva Cotización</span>
             </button>
+            {quotes.length === 0 && onRestoreDemo && (
+              <button
+                type="button"
+                onClick={onRestoreDemo}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Restaurar Cotizaciones Demo</span>
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -232,6 +391,15 @@ export const QuotesListView: React.FC<Props> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                  <th className="py-3 px-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={filteredQuotes.length > 0 && selectedIds.length === filteredQuotes.length}
+                      onChange={handleToggleSelectAll}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      title="Seleccionar todas"
+                    />
+                  </th>
                   <th className="py-3 px-4">Folio / Número</th>
                   <th className="py-3 px-4">Cliente / Receptor</th>
                   <th className="py-3 px-4">Fechas</th>
@@ -245,7 +413,21 @@ export const QuotesListView: React.FC<Props> = ({
                 {filteredQuotes.map((q) => {
                   const statusCfg = statusConfigs[q.status] || statusConfigs.borrador;
                   return (
-                    <tr key={q.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={q.id}
+                      className={`hover:bg-slate-50/70 transition-colors ${
+                        selectedIds.includes(q.id) ? 'bg-blue-50/40' : ''
+                      }`}
+                    >
+                      {/* Checkbox */}
+                      <td className="py-3 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(q.id)}
+                          onChange={() => handleToggleSelectOne(q.id)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
                       {/* Folio */}
                       <td className="py-3 px-4">
                         <button
@@ -385,15 +567,7 @@ export const QuotesListView: React.FC<Props> = ({
                           </button>
 
                           <button
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  `¿Está seguro de eliminar permanentemente la cotización ${q.folio}?`
-                                )
-                              ) {
-                                onDeleteQuote(q.id);
-                              }
-                            }}
+                            onClick={() => handlePromptDeleteSingle(q)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
                             title="Eliminar cotización"
                           >
@@ -409,6 +583,19 @@ export const QuotesListView: React.FC<Props> = ({
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        details={confirmModal.details}
+        confirmLabel={confirmModal.confirmLabel}
+        variant={confirmModal.variant}
+        requireConfirmWord={confirmModal.requireConfirmWord}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

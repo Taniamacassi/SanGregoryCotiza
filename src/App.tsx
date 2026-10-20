@@ -17,16 +17,24 @@ import {
   saveClients,
   upsertClient,
   deleteClient as removeClient,
+  deleteMultipleClients,
+  clearClients,
   getProducts,
   saveProducts,
   upsertProduct,
   deleteProduct as removeProduct,
+  deleteMultipleProducts,
+  clearProducts,
   getQuotes,
   saveQuotes,
   upsertQuote,
   deleteQuote as removeQuote,
+  deleteMultipleQuotes,
+  clearQuotes,
   getTermsTemplates,
   saveTermsTemplates,
+  clearAllCleanSlate,
+  resetToDemoData,
   getNextFolio,
   getGoogleSheetsConfig,
   saveGoogleSheetsConfig,
@@ -264,6 +272,24 @@ export default function App() {
       setSelectedQuote(null);
       setCurrentView('quotes');
     }
+    showToast('Cotización eliminada.');
+  };
+
+  const handleDeleteMultipleQuotes = (ids: string[]) => {
+    const updated = deleteMultipleQuotes(ids);
+    setQuotes(updated);
+    if (selectedQuote && ids.includes(selectedQuote.id)) {
+      setSelectedQuote(null);
+      setCurrentView('quotes');
+    }
+    showToast(`${ids.length} cotizaciones eliminadas.`);
+  };
+
+  const handleClearAllQuotes = () => {
+    clearQuotes();
+    setQuotes([]);
+    setSelectedQuote(null);
+    showToast('Historial de cotizaciones vaciado (Data Limpia).');
   };
 
   const handleUpdateQuoteStatus = (id: string, newStatus: QuoteStatus) => {
@@ -290,6 +316,19 @@ export default function App() {
   const handleDeleteClient = (id: string) => {
     const updated = removeClient(id);
     setClients(updated);
+    showToast('Cliente eliminado.');
+  };
+
+  const handleDeleteMultipleClients = (ids: string[]) => {
+    const updated = deleteMultipleClients(ids);
+    setClients(updated);
+    showToast(`${ids.length} clientes eliminados.`);
+  };
+
+  const handleClearAllClients = () => {
+    clearClients();
+    setClients([]);
+    showToast('Directorio de clientes vaciado (Data Limpia).');
   };
 
   // Handlers for Products
@@ -301,6 +340,38 @@ export default function App() {
   const handleDeleteProduct = (id: string) => {
     const updated = removeProduct(id);
     setProducts(updated);
+    showToast('Producto eliminado.');
+  };
+
+  const handleDeleteMultipleProducts = (ids: string[]) => {
+    const updated = deleteMultipleProducts(ids);
+    setProducts(updated);
+    showToast(`${ids.length} productos eliminados.`);
+  };
+
+  const handleClearAllProducts = () => {
+    clearProducts();
+    setProducts([]);
+    showToast('Catálogo de productos vaciado (Data Limpia).');
+  };
+
+  const handleClearAllCleanSlate = () => {
+    clearAllCleanSlate();
+    setQuotes([]);
+    setClients([]);
+    setProducts([]);
+    setSelectedQuote(null);
+    showToast('¡Limpieza total completada! Cotizaciones, clientes y productos vaciados.');
+  };
+
+  const handleRestoreDemo = () => {
+    resetToDemoData();
+    setCompany(getCompanyProfile());
+    setClients(getClients());
+    setProducts(getProducts());
+    setQuotes(getQuotes());
+    setTermsTemplates(getTermsTemplates());
+    showToast('Datos de demostración restaurados.');
   };
 
   // Handlers for Company
@@ -571,9 +642,12 @@ export default function App() {
             onEditQuote={handleEditQuote}
             onDuplicateQuote={handleDuplicateQuote}
             onDeleteQuote={handleDeleteQuote}
+            onDeleteMultipleQuotes={handleDeleteMultipleQuotes}
+            onClearAllQuotes={handleClearAllQuotes}
             onUpdateStatus={handleUpdateQuoteStatus}
             onOpenGoogleSheets={() => setGoogleSheetsModalOpen(true)}
             onSyncQuoteToSheets={handleSyncQuoteToSheets}
+            onRestoreDemo={handleRestoreDemo}
           />
         )}
 
@@ -610,7 +684,10 @@ export default function App() {
             company={company}
             onSaveClient={handleSaveClient}
             onDeleteClient={handleDeleteClient}
+            onDeleteMultipleClients={handleDeleteMultipleClients}
+            onClearAllClients={handleClearAllClients}
             onCreateQuoteForClient={handleStartCreateQuoteForClient}
+            onRestoreDemo={handleRestoreDemo}
           />
         )}
 
@@ -620,6 +697,9 @@ export default function App() {
             company={company}
             onSaveProduct={handleSaveProduct}
             onDeleteProduct={handleDeleteProduct}
+            onDeleteMultipleProducts={handleDeleteMultipleProducts}
+            onClearAllProducts={handleClearAllProducts}
+            onRestoreDemo={handleRestoreDemo}
           />
         )}
 
@@ -628,12 +708,20 @@ export default function App() {
             company={company}
             termsTemplates={termsTemplates}
             securityConfig={securityConfig}
+            quotesCount={quotes.length}
+            clientsCount={clients.length}
+            productsCount={products.length}
             onSaveCompany={handleSaveCompany}
             onSaveTermsTemplates={handleSaveTermsTemplates}
             onSaveSecurityConfig={(cfg) => {
               saveSecurityConfig(cfg);
               setSecurityConfig(cfg);
             }}
+            onClearAllCleanSlate={handleClearAllCleanSlate}
+            onClearQuotes={handleClearAllQuotes}
+            onClearProducts={handleClearAllProducts}
+            onClearClients={handleClearAllClients}
+            onRestoreDemo={handleRestoreDemo}
             onLogout={handleLogout}
           />
         )}

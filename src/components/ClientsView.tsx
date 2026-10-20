@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Client, Quote, CompanyProfile } from '../types';
 import { formatCurrency } from '../utils/storage';
+import { ConfirmModal } from './ConfirmModal';
 import {
   Users,
   Plus,
@@ -13,6 +14,8 @@ import {
   Building,
   FileText,
   FileCheck,
+  CheckSquare,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Props {
@@ -21,7 +24,10 @@ interface Props {
   company: CompanyProfile;
   onSaveClient: (client: Client) => void;
   onDeleteClient: (id: string) => void;
+  onDeleteMultipleClients?: (ids: string[]) => void;
+  onClearAllClients?: () => void;
   onCreateQuoteForClient: (client: Client) => void;
+  onRestoreDemo?: () => void;
 }
 
 export const ClientsView: React.FC<Props> = ({
@@ -30,11 +36,30 @@ export const ClientsView: React.FC<Props> = ({
   company,
   onSaveClient,
   onDeleteClient,
+  onDeleteMultipleClients,
+  onClearAllClients,
   onCreateQuoteForClient,
+  onRestoreDemo,
 }) => {
   const [search, setSearch] = useState('');
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    details?: string;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'primary';
+    requireConfirmWord?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // Form fields
   const [name, setName] = useState('');
@@ -109,6 +134,74 @@ export const ClientsView: React.FC<Props> = ({
       c.email?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleToggleSelectAll = () => {
+    if (selectedIds.length === filteredClients.length && filteredClients.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredClients.map((c) => c.id));
+    }
+  };
+
+  const handleToggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handlePromptDeleteSingle = (cli: Client) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '¿Eliminar cliente del directorio?',
+      message: `Está a punto de eliminar al cliente "${cli.name}". Esta acción no se puede deshacer.`,
+      details: `${cli.taxIdLabel || 'RUC'}: ${cli.taxId || 'Sin número'} | Contacto: ${cli.contactPerson || 'N/A'}`,
+      confirmLabel: 'Eliminar Cliente',
+      variant: 'danger',
+      onConfirm: () => {
+        onDeleteClient(cli.id);
+        setSelectedIds((prev) => prev.filter((id) => id !== cli.id));
+      },
+    });
+  };
+
+  const handlePromptDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    setConfirmModal({
+      isOpen: true,
+      title: `¿Eliminar ${selectedIds.length} cliente${selectedIds.length > 1 ? 's' : ''} seleccionado${selectedIds.length > 1 ? 's' : ''}?`,
+      message: `Se eliminarán permanentemente los ${selectedIds.length} clientes seleccionados del directorio.`,
+      confirmLabel: `Eliminar (${selectedIds.length})`,
+      variant: 'danger',
+      onConfirm: () => {
+        if (onDeleteMultipleClients) {
+          onDeleteMultipleClients(selectedIds);
+        } else {
+          selectedIds.forEach((id) => onDeleteClient(id));
+        }
+        setSelectedIds([]);
+      },
+    });
+  };
+
+  const handlePromptClearAll = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: '¿Vaciar Directorio de Clientes (Data Limpia)?',
+      message: 'Esta acción eliminará TODOS los clientes registrados para comenzar con una base de datos limpia.',
+      details: `Total a eliminar: ${clients.length} clientes registrados.`,
+      confirmLabel: 'Vaciar Todo (Data Limpia)',
+      variant: 'danger',
+      requireConfirmWord: 'LIMPIAR',
+      onConfirm: () => {
+        if (onClearAllClients) {
+          onClearAllClients();
+        } else {
+          clients.forEach((c) => onDeleteClient(c.id));
+        }
+        setSelectedIds([]);
+      },
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -122,18 +215,62 @@ export const ClientsView: React.FC<Props> = ({
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Registrar Cliente</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {clients.length > 0 && onClearAllClients && (
+            <button
+              type="button"
+              onClick={handlePromptClearAll}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+              title="Vaciar todos los clientes para empezar con data limpia"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Vaciar Clientes (Data Limpia)</span>
+            </button>
+          )}
+
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Registrar Cliente</span>
+          </button>
+        </div>
       </div>
 
-      {/* Search Input */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-        <div className="relative">
+      {/* Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="bg-slate-900 text-white p-3 px-4 rounded-xl flex items-center justify-between gap-4 shadow-lg animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-center gap-2 text-xs font-semibold">
+            <CheckSquare className="w-4 h-4 text-blue-400" />
+            <span>
+              {selectedIds.length} cliente{selectedIds.length > 1 ? 's' : ''} seleccionado{selectedIds.length > 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 text-xs text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Deseleccionar
+            </button>
+            <button
+              type="button"
+              onClick={handlePromptDeleteSelected}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Eliminar Seleccionados ({selectedIds.length})</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Search Input & Select All toggle */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
           <input
             type="text"
@@ -143,25 +280,53 @@ export const ClientsView: React.FC<Props> = ({
             className="w-full text-xs pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-blue-500"
           />
         </div>
+
+        {filteredClients.length > 0 && (
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer self-start sm:self-center">
+            <input
+              type="checkbox"
+              checked={selectedIds.length === filteredClients.length}
+              onChange={handleToggleSelectAll}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>Seleccionar todos ({filteredClients.length})</span>
+          </label>
+        )}
       </div>
 
       {/* Clients Cards Grid */}
       {filteredClients.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center space-y-3">
-          <Users className="w-8 h-8 text-slate-400 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-800">
-            {search ? 'No se encontraron clientes coincidentes' : 'No hay clientes registrados'}
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+            <Users className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900">
+            {search ? 'No se encontraron clientes coincidentes' : 'Directorio Vacío / Data Limpia'}
           </h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Agregue los datos de sus clientes para emitir presupuestos rápidamente con sus datos fiscales pre-cargados.
+          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+            {search
+              ? 'Intente modificando el término de búsqueda o verifique la identificación fiscal.'
+              : 'El directorio de clientes se encuentra limpio. Registre a sus clientes reales para emitir cotizaciones al instante.'}
           </p>
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Agregar Primer Cliente</span>
-          </button>
+          <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+            <button
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Agregar Primer Cliente</span>
+            </button>
+            {clients.length === 0 && onRestoreDemo && (
+              <button
+                type="button"
+                onClick={onRestoreDemo}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Restaurar Clientes Demo</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -172,21 +337,31 @@ export const ClientsView: React.FC<Props> = ({
             return (
               <div
                 key={cli.id}
-                className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between hover:border-slate-300 transition-all space-y-4"
+                className={`bg-white rounded-xl border shadow-xs p-5 flex flex-col justify-between hover:border-slate-300 transition-all space-y-4 ${
+                  selectedIds.includes(cli.id) ? 'border-blue-500 bg-blue-50/20 ring-1 ring-blue-500/20' : 'border-slate-200'
+                }`}
               >
                 <div className="space-y-2.5">
                   <div className="flex justify-between items-start gap-2">
-                    <div className="space-y-0.5">
-                      <h3 className="text-sm font-bold text-slate-900 leading-snug">
-                        {cli.name}
-                      </h3>
-                      {cli.taxId && (
-                        <p className="font-mono text-[11px] text-slate-500 font-semibold">
-                          {cli.taxIdLabel || company.taxIdLabel || 'RUC'}: {cli.taxId}
-                        </p>
-                      )}
+                    <div className="flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(cli.id)}
+                        onChange={() => handleToggleSelectOne(cli.id)}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mt-1 cursor-pointer"
+                      />
+                      <div className="space-y-0.5">
+                        <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                          {cli.name}
+                        </h3>
+                        {cli.taxId && (
+                          <p className="font-mono text-[11px] text-slate-500 font-semibold">
+                            {cli.taxIdLabel || company.taxIdLabel || 'RUC'}: {cli.taxId}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => openEditModal(cli)}
                         className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
@@ -195,15 +370,7 @@ export const ClientsView: React.FC<Props> = ({
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `¿Está seguro de eliminar a ${cli.name}?`
-                            )
-                          ) {
-                            onDeleteClient(cli.id);
-                          }
-                        }}
+                        onClick={() => handlePromptDeleteSingle(cli)}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
                         title="Eliminar cliente"
                       >
@@ -441,6 +608,19 @@ export const ClientsView: React.FC<Props> = ({
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        details={confirmModal.details}
+        confirmLabel={confirmModal.confirmLabel}
+        variant={confirmModal.variant}
+        requireConfirmWord={confirmModal.requireConfirmWord}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

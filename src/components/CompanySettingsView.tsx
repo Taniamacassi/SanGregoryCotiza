@@ -36,20 +36,31 @@ import {
   Eye,
   EyeOff,
   LogOut,
+  RefreshCw,
+  Eraser,
 } from 'lucide-react';
 import {
   exportAllData,
   importAllData,
   resetToDemoData,
 } from '../utils/storage';
+import { ConfirmModal } from './ConfirmModal';
 
 interface Props {
   company: CompanyProfile;
   termsTemplates: TermsTemplate[];
   securityConfig: SecurityConfig;
+  quotesCount?: number;
+  clientsCount?: number;
+  productsCount?: number;
   onSaveCompany: (updated: CompanyProfile) => void;
   onSaveTermsTemplates: (templates: TermsTemplate[]) => void;
   onSaveSecurityConfig: (security: SecurityConfig) => void;
+  onClearAllCleanSlate?: () => void;
+  onClearQuotes?: () => void;
+  onClearProducts?: () => void;
+  onClearClients?: () => void;
+  onRestoreDemo?: () => void;
   onLogout?: () => void;
 }
 
@@ -57,9 +68,17 @@ export const CompanySettingsView: React.FC<Props> = ({
   company,
   termsTemplates,
   securityConfig,
+  quotesCount = 0,
+  clientsCount = 0,
+  productsCount = 0,
   onSaveCompany,
   onSaveTermsTemplates,
   onSaveSecurityConfig,
+  onClearAllCleanSlate,
+  onClearQuotes,
+  onClearProducts,
+  onClearClients,
+  onRestoreDemo,
   onLogout,
 }) => {
   const [profile, setProfile] = useState<CompanyProfile>(() => {
@@ -80,6 +99,21 @@ export const CompanySettingsView: React.FC<Props> = ({
   const [showSecPin, setShowSecPin] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'payments' | 'fiscal' | 'terms' | 'backup' | 'security'>('profile');
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    details?: string;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'primary';
+    requireConfirmWord?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // Handle Logo File Upload (converted to Base64 data URL)
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1581,22 +1615,160 @@ export const CompanySettingsView: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Reset Demo Data */}
-          <div className="p-5 border border-rose-200 bg-rose-50/50 rounded-xl space-y-3">
-            <div className="flex items-center gap-2 text-rose-800 font-bold">
-              <AlertTriangle className="w-4 h-4" />
-              <span>Zona de Peligro / Restablecer Demostración</span>
+          {/* Clean Slate & Reset Data Management */}
+          <div className="p-6 border border-slate-200 bg-slate-50/70 rounded-xl space-y-4">
+            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+              <Eraser className="w-4 h-4 text-rose-600" />
+              <span>Centro de Data Limpia & Gestión de Datos</span>
             </div>
             <p className="text-slate-600 text-[11px] leading-relaxed">
-              Si desea reiniciar el sistema con los datos de ejemplo iniciales (empresas, clientes y cotizaciones de muestra), presione el siguiente botón.
+              Utilice estas opciones para eliminar las cotizaciones, clientes o productos de prueba y comenzar a operar con su empresa 100% limpia.
             </p>
-            <button
-              type="button"
-              onClick={handleResetData}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg text-xs transition-colors cursor-pointer"
-            >
-              Restablecer Datos de Demostración
-            </button>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* Total Clean Slate */}
+              <div className="p-4 bg-white border border-rose-200 rounded-xl space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2 text-rose-800 font-bold text-xs">
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <span>Limpieza Total a Cero (Data Limpia)</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Elimina simultáneamente todas las cotizaciones, clientes y productos demo para comenzar su negocio con una base de datos vacía y limpia.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmModal({
+                      isOpen: true,
+                      title: '¿Limpieza Total a Cero (Data Limpia)?',
+                      message: 'Esta acción eliminará simultáneamente todas las cotizaciones, clientes y catálogo de productos. Su configuración de empresa permanecerá intacta.',
+                      details: `Se eliminarán: ${quotesCount} cotizaciones, ${clientsCount} clientes y ${productsCount} productos.`,
+                      confirmLabel: 'Vaciar Todo (Data Limpia)',
+                      variant: 'danger',
+                      requireConfirmWord: 'LIMPIAR',
+                      onConfirm: () => {
+                        if (onClearAllCleanSlate) {
+                          onClearAllCleanSlate();
+                        }
+                      },
+                    });
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold rounded-lg transition-colors cursor-pointer text-xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Limpiar Todo (Data Limpia)</span>
+                </button>
+              </div>
+
+              {/* Restore Demo Data */}
+              <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
+                  <RefreshCw className="w-4 h-4 text-blue-600" />
+                  <span>Restablecer Datos de Demostración</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Si desea explorar ejemplos o volver a cargar datos de muestra completos, puede restaurar los registros demo en cualquier momento.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmModal({
+                      isOpen: true,
+                      title: '¿Restablecer datos de demostración?',
+                      message: 'Se cargarán las cotizaciones, clientes y catálogo de ejemplo iniciales.',
+                      confirmLabel: 'Restablecer Demostración',
+                      variant: 'primary',
+                      onConfirm: () => {
+                        if (onRestoreDemo) {
+                          onRestoreDemo();
+                        } else {
+                          resetToDemoData();
+                          window.location.reload();
+                        }
+                      },
+                    });
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg transition-colors cursor-pointer text-xs border border-slate-300"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Cargar Datos de Demostración</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Granular Module Cleaning */}
+            <div className="pt-2 border-t border-slate-200">
+              <span className="text-[11px] font-bold text-slate-700 block mb-2">
+                Limpieza Selectiva por Módulo:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {onClearQuotes && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmModal({
+                        isOpen: true,
+                        title: '¿Vaciar Historial de Cotizaciones?',
+                        message: 'Se eliminarán todas las cotizaciones registradas para dejar el historial en blanco.',
+                        details: `Total: ${quotesCount} cotizaciones.`,
+                        confirmLabel: 'Vaciar Cotizaciones',
+                        variant: 'danger',
+                        requireConfirmWord: 'LIMPIAR',
+                        onConfirm: onClearQuotes,
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-700 font-semibold rounded-lg border border-rose-200 text-xs transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Vaciar solo Cotizaciones ({quotesCount})</span>
+                  </button>
+                )}
+
+                {onClearProducts && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmModal({
+                        isOpen: true,
+                        title: '¿Vaciar Catálogo de Productos?',
+                        message: 'Se eliminarán todos los productos y servicios para comenzar el catálogo desde cero.',
+                        details: `Total: ${productsCount} productos.`,
+                        confirmLabel: 'Vaciar Catálogo',
+                        variant: 'danger',
+                        requireConfirmWord: 'LIMPIAR',
+                        onConfirm: onClearProducts,
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-700 font-semibold rounded-lg border border-rose-200 text-xs transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Vaciar solo Catálogo ({productsCount})</span>
+                  </button>
+                )}
+
+                {onClearClients && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmModal({
+                        isOpen: true,
+                        title: '¿Vaciar Directorio de Clientes?',
+                        message: 'Se eliminarán todos los clientes guardados en el directorio.',
+                        details: `Total: ${clientsCount} clientes.`,
+                        confirmLabel: 'Vaciar Clientes',
+                        variant: 'danger',
+                        requireConfirmWord: 'LIMPIAR',
+                        onConfirm: onClearClients,
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-700 font-semibold rounded-lg border border-rose-200 text-xs transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Vaciar solo Clientes ({clientsCount})</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

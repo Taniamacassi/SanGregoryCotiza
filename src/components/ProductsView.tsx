@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Product, CompanyProfile } from '../types';
 import { formatCurrency } from '../utils/storage';
+import { ConfirmModal } from './ConfirmModal';
 import {
   Package,
   Plus,
@@ -14,6 +15,10 @@ import {
   Image as ImageIcon,
   Upload,
   X,
+  CheckSquare,
+  Square,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Props {
@@ -21,6 +26,9 @@ interface Props {
   company: CompanyProfile;
   onSaveProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
+  onDeleteMultipleProducts?: (ids: string[]) => void;
+  onClearAllProducts?: () => void;
+  onRestoreDemo?: () => void;
 }
 
 export const ProductsView: React.FC<Props> = ({
@@ -28,12 +36,31 @@ export const ProductsView: React.FC<Props> = ({
   company,
   onSaveProduct,
   onDeleteProduct,
+  onDeleteMultipleProducts,
+  onClearAllProducts,
+  onRestoreDemo,
 }) => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [previewImageModal, setPreviewImageModal] = useState<{ url: string; title: string } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    details?: string;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'primary';
+    requireConfirmWord?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // Form
   const [code, setCode] = useState('');
@@ -127,6 +154,74 @@ export const ProductsView: React.FC<Props> = ({
     return matchesSearch && matchesCat;
   });
 
+  const handleToggleSelectAll = () => {
+    if (selectedIds.length === filtered.length && filtered.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filtered.map((p) => p.id));
+    }
+  };
+
+  const handleToggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handlePromptDeleteSingle = (p: Product) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '¿Eliminar producto del catálogo?',
+      message: `Está a punto de eliminar "${p.name}". Esta acción no se puede deshacer.`,
+      details: `Código: ${p.code || 'S/N'} | Precio: ${formatCurrency(p.unitPrice, company.currency)}`,
+      confirmLabel: 'Eliminar Producto',
+      variant: 'danger',
+      onConfirm: () => {
+        onDeleteProduct(p.id);
+        setSelectedIds((prev) => prev.filter((id) => id !== p.id));
+      },
+    });
+  };
+
+  const handlePromptDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    setConfirmModal({
+      isOpen: true,
+      title: `¿Eliminar ${selectedIds.length} producto${selectedIds.length > 1 ? 's' : ''} seleccionado${selectedIds.length > 1 ? 's' : ''}?`,
+      message: `Se eliminarán permanentemente los ${selectedIds.length} productos seleccionados del catálogo.`,
+      confirmLabel: `Eliminar (${selectedIds.length})`,
+      variant: 'danger',
+      onConfirm: () => {
+        if (onDeleteMultipleProducts) {
+          onDeleteMultipleProducts(selectedIds);
+        } else {
+          selectedIds.forEach((id) => onDeleteProduct(id));
+        }
+        setSelectedIds([]);
+      },
+    });
+  };
+
+  const handlePromptClearAll = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: '¿Vaciar Catálogo Completo (Data Limpia)?',
+      message: 'Esta acción eliminará TODOS los productos y servicios del catálogo para dejarlo completamente limpio.',
+      details: `Total a eliminar: ${products.length} productos registrados.`,
+      confirmLabel: 'Vaciar Todo (Data Limpia)',
+      variant: 'danger',
+      requireConfirmWord: 'LIMPIAR',
+      onConfirm: () => {
+        if (onClearAllProducts) {
+          onClearAllProducts();
+        } else {
+          products.forEach((p) => onDeleteProduct(p.id));
+        }
+        setSelectedIds([]);
+      },
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -140,14 +235,58 @@ export const ProductsView: React.FC<Props> = ({
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nuevo Producto / Servicio</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {products.length > 0 && onClearAllProducts && (
+            <button
+              type="button"
+              onClick={handlePromptClearAll}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+              title="Vaciar todo el catálogo para empezar con data limpia"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Vaciar Catálogo (Data Limpia)</span>
+            </button>
+          )}
+
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Producto / Servicio</span>
+          </button>
+        </div>
       </div>
+
+      {/* Floating / Active Bulk Selection Toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="bg-slate-900 text-white p-3 px-4 rounded-xl flex items-center justify-between gap-4 shadow-lg animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-center gap-2 text-xs font-semibold">
+            <CheckSquare className="w-4 h-4 text-blue-400" />
+            <span>
+              {selectedIds.length} producto{selectedIds.length > 1 ? 's' : ''} seleccionado{selectedIds.length > 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 text-xs text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Deseleccionar
+            </button>
+            <button
+              type="button"
+              onClick={handlePromptDeleteSelected}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Eliminar Seleccionados ({selectedIds.length})</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -182,22 +321,38 @@ export const ProductsView: React.FC<Props> = ({
       {/* Products Table */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center space-y-3">
-          <Package className="w-8 h-8 text-slate-400 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-800">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+            <Package className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900">
             {search || categoryFilter !== 'all'
               ? 'No hay productos que coincidan con la búsqueda'
-              : 'El catálogo está vacío'}
+              : 'Catálogo Vacío / Data Limpia'}
           </h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Registre sus servicios, productos o tarifas por hora con imagen referencial para seleccionarlos automáticamente en cada cotización.
+          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+            {search || categoryFilter !== 'all'
+              ? 'Intente modificando el término de búsqueda o seleccione otra categoría.'
+              : 'El catálogo se encuentra limpio de datos de prueba. Comience a registrar los productos o servicios reales de su negocio.'}
           </p>
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Crear Primer Producto</span>
-          </button>
+          <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+            <button
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Crear Primer Producto</span>
+            </button>
+            {products.length === 0 && onRestoreDemo && (
+              <button
+                type="button"
+                onClick={onRestoreDemo}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Restaurar Productos Demo</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -205,6 +360,15 @@ export const ProductsView: React.FC<Props> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                  <th className="py-3 px-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={filtered.length > 0 && selectedIds.length === filtered.length}
+                      onChange={handleToggleSelectAll}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      title="Seleccionar todos los productos"
+                    />
+                  </th>
                   <th className="py-3 px-3 w-14 text-center">Foto</th>
                   <th className="py-3 px-4">Código / SKU</th>
                   <th className="py-3 px-4">Nombre y Descripción</th>
@@ -223,7 +387,22 @@ export const ProductsView: React.FC<Props> = ({
                       : null;
 
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={p.id}
+                      className={`hover:bg-slate-50/70 transition-colors ${
+                        selectedIds.includes(p.id) ? 'bg-blue-50/40' : ''
+                      }`}
+                    >
+                      {/* Checkbox */}
+                      <td className="py-2.5 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(p.id)}
+                          onChange={() => handleToggleSelectOne(p.id)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
+
                       {/* Thumbnail Image */}
                       <td className="py-2.5 px-3 text-center">
                         {p.imageUrl ? (
@@ -307,13 +486,9 @@ export const ProductsView: React.FC<Props> = ({
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (window.confirm(`¿Eliminar ${p.name} del catálogo?`)) {
-                                onDeleteProduct(p.id);
-                              }
-                            }}
+                            onClick={() => handlePromptDeleteSingle(p)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
-                            title="Eliminar"
+                            title="Eliminar producto"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -561,6 +736,19 @@ export const ProductsView: React.FC<Props> = ({
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        details={confirmModal.details}
+        confirmLabel={confirmModal.confirmLabel}
+        variant={confirmModal.variant}
+        requireConfirmWord={confirmModal.requireConfirmWord}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

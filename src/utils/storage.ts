@@ -105,6 +105,19 @@ export function deleteClient(id: string): Client[] {
   return updated;
 }
 
+export function deleteMultipleClients(ids: string[]): Client[] {
+  const current = getClients();
+  const set = new Set(ids);
+  const updated = current.filter((c) => !set.has(c.id));
+  saveClients(updated);
+  return updated;
+}
+
+export function clearClients(): Client[] {
+  saveClients([]);
+  return [];
+}
+
 // ----------------------------------------------------
 // Products
 // ----------------------------------------------------
@@ -133,6 +146,19 @@ export function deleteProduct(id: string): Product[] {
   return updated;
 }
 
+export function deleteMultipleProducts(ids: string[]): Product[] {
+  const current = getProducts();
+  const set = new Set(ids);
+  const updated = current.filter((p) => !set.has(p.id));
+  saveProducts(updated);
+  return updated;
+}
+
+export function clearProducts(): Product[] {
+  saveProducts([]);
+  return [];
+}
+
 // ----------------------------------------------------
 // Quotes
 // ----------------------------------------------------
@@ -159,6 +185,19 @@ export function deleteQuote(id: string): Quote[] {
   const updated = current.filter((q) => q.id !== id);
   saveQuotes(updated);
   return updated;
+}
+
+export function deleteMultipleQuotes(ids: string[]): Quote[] {
+  const current = getQuotes();
+  const set = new Set(ids);
+  const updated = current.filter((q) => !set.has(q.id));
+  saveQuotes(updated);
+  return updated;
+}
+
+export function clearQuotes(): Quote[] {
+  saveQuotes([]);
+  return [];
 }
 
 // ----------------------------------------------------
@@ -266,6 +305,13 @@ export function resetToDemoData(): void {
   safeSet(STORAGE_KEYS.PRODUCTS, INITIAL_PRODUCTS);
   safeSet(STORAGE_KEYS.QUOTES, INITIAL_QUOTES);
   safeSet(STORAGE_KEYS.TERMS, DEFAULT_TERMS_TEMPLATES);
+}
+
+export function clearAllCleanSlate(): { clients: Client[]; products: Product[]; quotes: Quote[] } {
+  safeSet(STORAGE_KEYS.CLIENTS, []);
+  safeSet(STORAGE_KEYS.PRODUCTS, []);
+  safeSet(STORAGE_KEYS.QUOTES, []);
+  return { clients: [], products: [], quotes: [] };
 }
 
 // ----------------------------------------------------
