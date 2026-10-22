@@ -12,10 +12,13 @@ import {
   getSpreadsheetInfo,
   syncAllDataToSpreadsheet,
   extractSpreadsheetId,
+  restoreFromGoogleSheets,
+  parseExcelWorkbook,
 } from '../utils/googleSheetsService';
 import {
   getGoogleSheetsConfig,
   saveGoogleSheetsConfig,
+  restoreDatasetFromExternal,
 } from '../utils/storage';
 import { GoogleSignInButton } from './GoogleSignInButton';
 import {
@@ -31,6 +34,15 @@ import {
   User as UserIcon,
   HelpCircle,
   Table,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Upload,
+  Layers,
+  Package,
+  Users,
+  Check,
+  FileUp,
+  Database,
 } from 'lucide-react';
 
 interface Props {
@@ -41,6 +53,12 @@ interface Props {
   products: Product[];
   company: CompanyProfile;
   onConfigChange?: (config: GoogleSheetsConfig | null) => void;
+  onRestoreData?: (
+    quotes: Quote[],
+    clients: Client[],
+    products: Product[],
+    mode: 'overwrite' | 'merge'
+  ) => void;
 }
 
 export const GoogleSheetsModal: React.FC<Props> = ({
@@ -51,6 +69,7 @@ export const GoogleSheetsModal: React.FC<Props> = ({
   products,
   company,
   onConfigChange,
+  onRestoreData,
 }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [hasToken, setHasToken] = useState<boolean>(false);
@@ -60,7 +79,7 @@ export const GoogleSheetsModal: React.FC<Props> = ({
     () => getGoogleSheetsConfig()
   );
 
-  const [activeTab, setActiveTab] = useState<'create' | 'link'>('create');
+  const [activeTab, setActiveTab] = useState<'create' | 'link' | 'excel'>('create');
   const [newSheetTitle, setNewSheetTitle] = useState(
     () => `Cotizaciones y Ventas - ${company.name || 'Mi Empresa'}`
   );
@@ -72,6 +91,16 @@ export const GoogleSheetsModal: React.FC<Props> = ({
 
   // Confirmation dialog state for destructive/overwrite operations
   const [showConfirmSync, setShowConfirmSync] = useState(false);
+
+  // State for Restoration Review
+  const [restorePreview, setRestorePreview] = useState<{
+    quotes: Quote[];
+    clients: Client[];
+    products: Product[];
+    stats: { quotes: number; items: number; clients: number; products: number };
+    sourceName: string;
+  } | null>(null);
+  const [restoreMode, setRestoreMode] = useState<'overwrite' | 'merge'>('overwrite');
 
   useEffect(() => {
     // Listen to auth state

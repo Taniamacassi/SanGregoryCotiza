@@ -314,6 +314,46 @@ export function clearAllCleanSlate(): { clients: Client[]; products: Product[]; 
   return { clients: [], products: [], quotes: [] };
 }
 
+export function restoreDatasetFromExternal(
+  newQuotes: Quote[],
+  newClients: Client[],
+  newProducts: Product[],
+  mode: 'overwrite' | 'merge' = 'overwrite'
+): { quotes: Quote[]; clients: Client[]; products: Product[] } {
+  if (mode === 'overwrite') {
+    saveQuotes(newQuotes);
+    saveClients(newClients);
+    saveProducts(newProducts);
+    return { quotes: newQuotes, clients: newClients, products: newProducts };
+  } else {
+    // Merge mode: existing items preserved, incoming items updated or added
+    const curQuotes = getQuotes();
+    const curClients = getClients();
+    const curProducts = getProducts();
+
+    const quoteMap = new Map<string, Quote>();
+    curQuotes.forEach((q) => quoteMap.set(q.folio, q));
+    newQuotes.forEach((q) => quoteMap.set(q.folio, q));
+
+    const clientMap = new Map<string, Client>();
+    curClients.forEach((c) => clientMap.set(c.taxId || c.name, c));
+    newClients.forEach((c) => clientMap.set(c.taxId || c.name, c));
+
+    const productMap = new Map<string, Product>();
+    curProducts.forEach((p) => productMap.set(p.code || p.name, p));
+    newProducts.forEach((p) => productMap.set(p.code || p.name, p));
+
+    const mergedQuotes = Array.from(quoteMap.values());
+    const mergedClients = Array.from(clientMap.values());
+    const mergedProducts = Array.from(productMap.values());
+
+    saveQuotes(mergedQuotes);
+    saveClients(mergedClients);
+    saveProducts(mergedProducts);
+    return { quotes: mergedQuotes, clients: mergedClients, products: mergedProducts };
+  }
+}
+
 // ----------------------------------------------------
 // Google Sheets Config
 // ----------------------------------------------------
