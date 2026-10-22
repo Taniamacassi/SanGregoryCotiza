@@ -62,6 +62,7 @@ interface Props {
   onClearClients?: () => void;
   onRestoreDemo?: () => void;
   onLogout?: () => void;
+  onOpenGoogleSheets?: () => void;
 }
 
 export const CompanySettingsView: React.FC<Props> = ({
@@ -80,6 +81,7 @@ export const CompanySettingsView: React.FC<Props> = ({
   onClearClients,
   onRestoreDemo,
   onLogout,
+  onOpenGoogleSheets,
 }) => {
   const [profile, setProfile] = useState<CompanyProfile>(() => {
     const copy = { ...company };
@@ -1553,6 +1555,16 @@ export const CompanySettingsView: React.FC<Props> = ({
               <div className="text-[11px] text-emerald-800 bg-emerald-50 p-2 rounded border border-emerald-200 font-medium">
                 Pestañas: Cotizaciones, Items Cotizados, Clientes y Catálogo de Productos.
               </div>
+              {onOpenGoogleSheets && (
+                <button
+                  type="button"
+                  onClick={onOpenGoogleSheets}
+                  className="w-full mt-2 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-lg transition-colors cursor-pointer text-xs shadow-xs"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Sincronizar o Restaurar Base de Datos</span>
+                </button>
+              )}
             </div>
 
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">

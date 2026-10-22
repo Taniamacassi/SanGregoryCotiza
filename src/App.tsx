@@ -723,6 +723,7 @@ export default function App() {
             onClearClients={handleClearAllClients}
             onRestoreDemo={handleRestoreDemo}
             onLogout={handleLogout}
+            onOpenGoogleSheets={() => setGoogleSheetsModalOpen(true)}
           />
         )}
       </main>
@@ -736,6 +737,14 @@ export default function App() {
         products={products}
         company={company}
         onConfigChange={(newCfg) => setSheetsConfig(newCfg)}
+        onRestoreData={(newQuotes, newClients, newProducts, mode) => {
+          setQuotes(newQuotes);
+          setClients(newClients);
+          setProducts(newProducts);
+          showToast(
+            `¡Restauración exitosa! ${newQuotes.length} cotizaciones, ${newClients.length} clientes y ${newProducts.length} productos actualizados (${mode === 'overwrite' ? 'Data Limpia' : 'Combinado'}).`
+          );
+        }}
       />
 
       {/* Toast Notification */}
