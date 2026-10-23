@@ -1,6 +1,7 @@
 import React from 'react';
 import { Quote, Client, Product, CompanyProfile } from '../types';
 import { formatCurrency } from '../utils/storage';
+import { formatDateShort } from '../utils/dateUtils';
 import {
   FileText,
   CheckCircle,
@@ -222,7 +223,7 @@ export const DashboardView: React.FC<Props> = ({
                         {q.clientSnapshot?.name || 'Cliente'}
                       </td>
                       <td className="py-2.5 text-slate-500 tabular-nums">
-                        {q.issueDate}
+                        {formatDateShort(q.issueDate)}
                       </td>
                       <td className="py-2.5 text-right font-bold text-slate-900 tabular-nums">
                         <div>{formatCurrency(q.total, q.currency)}</div>

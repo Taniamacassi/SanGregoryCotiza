@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Quote, QuoteStatus, CompanyProfile } from '../types';
 import { formatCurrency } from '../utils/storage';
+import { formatDateShort } from '../utils/dateUtils';
 import { ConfirmModal } from './ConfirmModal';
 import {
   Search,
@@ -456,10 +457,10 @@ export const QuotesListView: React.FC<Props> = ({
                       {/* Dates */}
                       <td className="py-3 px-4">
                         <div className="text-slate-700 font-medium tabular-nums">
-                          Emisión: {q.issueDate}
+                          Emisión: {formatDateShort(q.issueDate)}
                         </div>
                         <div className="text-[11px] text-slate-500 tabular-nums">
-                          Válida hasta: {q.validUntil}
+                          Válida hasta: {formatDateShort(q.validUntil)}
                         </div>
                       </td>
 

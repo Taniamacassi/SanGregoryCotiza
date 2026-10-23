@@ -1,5 +1,6 @@
 import { Quote, Client, Product, QuoteItem, CompanyProfile, QuoteStatus } from '../types';
 import * as XLSX from 'xlsx';
+import { parseAnyDateToISO, computeValidUntilDate } from './dateUtils';
 
 export const SHEET_NAMES = {
   QUOTES: 'Cotizaciones',
@@ -114,8 +115,8 @@ export function quoteToRow(quote: Quote): (string | number)[] {
 
   return [
     quote.folio,
-    quote.issueDate || '',
-    quote.validUntil || '',
+    parseAnyDateToISO(quote.issueDate) || '',
+    parseAnyDateToISO(quote.validUntil) || '',
     (quote.status || 'borrador').toUpperCase(),
     cli?.name || 'Cliente sin asignar',
     cli?.taxIdLabel || 'RUC',
@@ -938,8 +939,8 @@ export function parseQuotesFromRows(
     const folio = String(r[0] || '').trim();
     if (!folio) continue;
 
-    const issueDate = String(r[1] || '').trim() || new Date().toISOString().split('T')[0];
-    const validUntil = String(r[2] || '').trim() || issueDate;
+    const issueDate = parseAnyDateToISO(r[1], new Date().toISOString().split('T')[0]);
+    const validUntil = parseAnyDateToISO(r[2], computeValidUntilDate(issueDate, 15));
     const rawStatus = String(r[3] || 'borrador').toLowerCase().trim();
     let status: QuoteStatus = 'borrador';
     if (rawStatus.includes('env')) status = 'enviada';
@@ -1221,7 +1222,7 @@ export function parseExcelWorkbook(
   products: Product[];
   stats: { quotes: number; items: number; clients: number; products: number };
 } {
-  const workbook = XLSX.read(buffer, { type: 'array' });
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
   const sheetNames = workbook.SheetNames || [];
 
   if (sheetNames.length === 0) {

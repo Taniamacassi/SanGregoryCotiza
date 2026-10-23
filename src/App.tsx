@@ -44,6 +44,7 @@ import {
   getSecurityConfig,
   saveSecurityConfig,
 } from './utils/storage';
+import { computeValidUntilDate } from './utils/dateUtils';
 import { getAccessToken, googleSignIn } from './utils/googleAuth';
 import { saveQuoteToSpreadsheet } from './utils/googleSheetsService';
 import { DashboardView } from './components/DashboardView';
@@ -131,12 +132,13 @@ export default function App() {
 
   const handleStartCreateQuoteForClient = (client: Client) => {
     const today = new Date().toISOString().split('T')[0];
+    const validityDays = company.defaultValidityDays || 15;
     const { folio } = getNextFolio();
     const tempQuote: Quote = {
       id: '',
       folio,
       issueDate: today,
-      validUntil: today,
+      validUntil: computeValidUntilDate(today, validityDays),
       clientId: client.id,
       clientSnapshot: client,
       companySnapshot: company,

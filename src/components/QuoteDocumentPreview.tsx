@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Quote, QuoteTheme } from '../types';
 import { formatCurrency } from '../utils/storage';
 import { numberToSpanishWords } from '../utils/numberToWords';
+import { formatDateToSpanish, formatDateShort } from '../utils/dateUtils';
 import {
   Printer,
   ArrowLeft,
@@ -141,7 +142,7 @@ export const QuoteDocumentPreview: React.FC<Props> = ({
     const text = `Cotización ${quote.folio} para ${cli.name}\nTotal: ${formatCurrency(
       quote.total,
       currency
-    )}\nValidez hasta: ${quote.validUntil}\nEmisor: ${comp.name}`;
+    )}\nValidez hasta: ${formatDateToSpanish(quote.validUntil)}\nEmisor: ${comp.name}`;
     navigator.clipboard.writeText(text);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -152,7 +153,7 @@ export const QuoteDocumentPreview: React.FC<Props> = ({
       `Hola ${cli.contactPerson || cli.name}, adjuntamos los detalles de la Cotización *${quote.folio}* de *${comp.name}* por un valor total de *${formatCurrency(
         quote.total,
         currency
-      )}*. Válida hasta el ${quote.validUntil}. ¡Quedamos atentos a sus comentarios!`
+      )}*. Válida hasta el ${formatDateToSpanish(quote.validUntil)}. ¡Quedamos atentos a sus comentarios!`
     );
     const phone = cli.phone?.replace(/[^0-9]/g, '');
     const url = phone ? `https://wa.me/${phone}?text=${message}` : `https://wa.me/?text=${message}`;
@@ -408,11 +409,11 @@ export const QuoteDocumentPreview: React.FC<Props> = ({
               <div className="mt-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-700 space-y-1.5 sm:text-right inline-block min-w-[200px]">
                 <div className="flex justify-between sm:justify-end gap-3">
                   <span className="text-slate-500">Fecha de Emisión:</span>
-                  <span className="font-semibold tabular-nums">{quote.issueDate}</span>
+                  <span className="font-semibold tabular-nums">{formatDateShort(quote.issueDate)}</span>
                 </div>
                 <div className="flex justify-between sm:justify-end gap-3">
                   <span className="text-slate-500">Válida Hasta:</span>
-                  <span className="font-semibold text-slate-900 tabular-nums">{quote.validUntil}</span>
+                  <span className="font-semibold text-slate-900 tabular-nums">{formatDateShort(quote.validUntil)}</span>
                 </div>
                 <div className="flex justify-between sm:justify-end gap-3 border-t border-slate-200 pt-1">
                   <span className="text-slate-500">Moneda:</span>
@@ -1042,7 +1043,13 @@ export const QuoteDocumentPreview: React.FC<Props> = ({
                 {quote.validUntil && (
                   <div>
                     <span className="font-semibold text-slate-900 block">Validez de la Oferta:</span>
-                    <span>Vigente hasta el {quote.validUntil} ({quote.validityDays || 15} días).</span>
+                    <span className="text-slate-700">
+                      Vigente hasta el{' '}
+                      <strong className="text-slate-950 font-bold">
+                        {formatDateToSpanish(quote.validUntil)}
+                      </strong>{' '}
+                      ({quote.validityDays || 15} días de vigencia a partir de su emisión el {formatDateShort(quote.issueDate)}).
+                    </span>
                   </div>
                 )}
               </div>

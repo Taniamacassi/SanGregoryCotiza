@@ -9,6 +9,7 @@ import {
   RucAuthSession,
   SecurityConfig,
 } from '../types';
+import { parseAnyDateToISO, computeValidUntilDate } from './dateUtils';
 import {
   INITIAL_COMPANY_PROFILE,
   INITIAL_CLIENTS,
@@ -163,11 +164,38 @@ export function clearProducts(): Product[] {
 // Quotes
 // ----------------------------------------------------
 export function getQuotes(): Quote[] {
-  return safeGet<Quote[]>(STORAGE_KEYS.QUOTES, INITIAL_QUOTES);
+  const rawQuotes = safeGet<Quote[]>(STORAGE_KEYS.QUOTES, INITIAL_QUOTES);
+  return rawQuotes.map((q) => {
+    const cleanIssue = parseAnyDateToISO(q.issueDate);
+    const cleanValid = parseAnyDateToISO(
+      q.validUntil,
+      computeValidUntilDate(cleanIssue, q.validityDays || 15)
+    );
+    if (cleanIssue !== q.issueDate || cleanValid !== q.validUntil) {
+      return {
+        ...q,
+        issueDate: cleanIssue,
+        validUntil: cleanValid,
+      };
+    }
+    return q;
+  });
 }
 
 export function saveQuotes(quotes: Quote[]): void {
-  safeSet(STORAGE_KEYS.QUOTES, quotes);
+  const normalized = quotes.map((q) => {
+    const cleanIssue = parseAnyDateToISO(q.issueDate);
+    const cleanValid = parseAnyDateToISO(
+      q.validUntil,
+      computeValidUntilDate(cleanIssue, q.validityDays || 15)
+    );
+    return {
+      ...q,
+      issueDate: cleanIssue,
+      validUntil: cleanValid,
+    };
+  });
+  safeSet(STORAGE_KEYS.QUOTES, normalized);
 }
 
 export function upsertQuote(quote: Quote): Quote[] {

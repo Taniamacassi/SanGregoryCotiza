@@ -15,6 +15,11 @@ import {
   formatCurrency,
 } from '../utils/storage';
 import {
+  parseAnyDateToISO,
+  computeValidUntilDate,
+  formatDateShort,
+} from '../utils/dateUtils';
+import {
   Plus,
   Trash2,
   Copy,
@@ -68,13 +73,7 @@ export const QuoteBuilderView: React.FC<Props> = ({
     : company.defaultValidityDays || 15;
 
   const computeValidUntil = (baseDate: string, days: number): string => {
-    try {
-      const d = new Date(baseDate);
-      d.setDate(d.getDate() + days);
-      return d.toISOString().split('T')[0];
-    } catch {
-      return baseDate;
-    }
+    return computeValidUntilDate(baseDate, days);
   };
 
   // State
@@ -83,13 +82,18 @@ export const QuoteBuilderView: React.FC<Props> = ({
     return getNextFolio().folio;
   });
 
-  const [issueDate, setIssueDate] = useState<string>(
-    initialQuote?.issueDate || today
-  );
+  const [issueDate, setIssueDate] = useState<string>(() => {
+    return parseAnyDateToISO(initialQuote?.issueDate, today);
+  });
   const [validityDays, setValidityDays] = useState<number>(initialValidityDays);
   const [validUntil, setValidUntil] = useState<string>(() => {
-    if (initialQuote?.validUntil) return initialQuote.validUntil;
-    return computeValidUntil(today, initialValidityDays);
+    if (initialQuote?.validUntil) {
+      return parseAnyDateToISO(
+        initialQuote.validUntil,
+        computeValidUntilDate(today, initialValidityDays)
+      );
+    }
+    return computeValidUntilDate(today, initialValidityDays);
   });
 
   const [status, setStatus] = useState<QuoteStatus>(
@@ -565,9 +569,19 @@ export const QuoteBuilderView: React.FC<Props> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1">
-            Fecha de Emisión
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-bold text-slate-700">
+              Fecha de Emisión
+            </label>
+            <button
+              type="button"
+              onClick={() => handleIssueDateChange(today)}
+              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+              title="Establecer fecha actual de hoy y recalcular validez"
+            >
+              Hoy ({formatDateShort(today)})
+            </button>
+          </div>
           <input
             type="date"
             value={issueDate}
@@ -589,7 +603,9 @@ export const QuoteBuilderView: React.FC<Props> = ({
               onChange={(e) => handleDaysChange(Number(e.target.value) || 1)}
               className="w-20 text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 text-center focus:outline-hidden focus:ring-1 focus:ring-blue-500"
             />
-            <span className="text-xs text-slate-500 self-center">días (hasta {validUntil})</span>
+            <span className="text-xs text-slate-500 self-center">
+              días (hasta {formatDateShort(validUntil)})
+            </span>
           </div>
         </div>
 
